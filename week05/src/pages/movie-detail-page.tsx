@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { Movie } from "../types/movie";
+import type { MovieDetail } from "../types/movie";
 import Footer from "../components/footer";
 import Icon from "../components/icon";
+import MovieImage from "../components/movie-image";
 import { cn } from "../lib/cn";
 import { useBookmarkStore } from "../stores/bookmark-store";
 
 interface MovieDetailPageProps {
-  movies: Movie[];
+  movies: MovieDetail[];
 }
 
 const RATINGS = [1, 2, 3, 4, 5];
@@ -37,10 +38,9 @@ function MovieDetailPage({ movies }: MovieDetailPageProps) {
   return (
     <>
       <section className="relative h-[360px] w-full overflow-hidden">
-        <img
+        <MovieImage
           src={movie.backdropPath}
           alt={`${movie.title} 배경`}
-          className="size-full object-cover"
         />
         <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/30 to-black/20" />
 
@@ -71,10 +71,9 @@ function MovieDetailPage({ movies }: MovieDetailPageProps) {
 
       <main className="flex w-full items-start gap-8 px-20 py-6">
         <div className="h-[286px] w-[200px] shrink-0 overflow-hidden rounded-[10px] bg-surface shadow-[0_12px_30px_rgba(12,15,20,0.12)]">
-          <img
+          <MovieImage
             src={movie.posterPath}
             alt={`${movie.title} 포스터`}
-            className="size-full object-cover"
           />
         </div>
 

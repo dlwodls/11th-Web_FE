@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { Movie } from "../types/movie";
 import { cn } from "../lib/cn";
 import Icon from "./icon";
+import MovieImage from "./movie-image";
 import { useBookmarkStore } from "../stores/bookmark-store";
 
 interface MovieCardProps {
@@ -20,10 +21,9 @@ function MovieCard({ movie, showBookmark = false }: MovieCardProps) {
     <article className="flex flex-col gap-1">
       <div className="relative aspect-[241.6/274] w-full overflow-hidden rounded-[10px] bg-surface">
         <Link to={`/movies/${id}`}>
-          <img
+          <MovieImage
             src={posterPath}
             alt={`${title} 포스터`}
-            className="size-full object-cover"
           />
         </Link>
 

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import type { Movie } from "../types/movie";
 import Footer from "../components/footer";
 import Icon from "../components/icon";
+import MovieImage from "../components/movie-image";
 import { BookmarkButton } from "../components/bookmark-button";
 
 interface MovieSearchPageProps {
@@ -172,10 +173,9 @@ function SearchResults({ keyword, results, onSearch }: SearchResultsProps) {
                   to={`/movies/${movie.id}`}
                   className="h-[190px] w-[126px] shrink-0 overflow-hidden rounded-[10px] bg-gray-200"
                 >
-                  <img
+                  <MovieImage
                     src={movie.posterPath}
                     alt={`${movie.title} 포스터`}
-                    className="size-full object-cover"
                   />
                 </Link>
 

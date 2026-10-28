@@ -1,6 +1,6 @@
-import type { Movie } from "../types/movie";
+import type { MovieDetail } from "../types/movie";
 
-export const movies: Movie[] = [
+export const movies: MovieDetail[] = [
   {
     id: 1,
     title: "스파이더맨: 브랜드 뉴 데이",
