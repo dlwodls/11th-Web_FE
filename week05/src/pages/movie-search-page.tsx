@@ -1,33 +1,31 @@
 import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import type { Movie } from "../types/movie";
+import { searchMovies } from "../api/movies";
+import { getErrorMessage } from "../api/tmdb";
+import { useAsync } from "../hooks/use-async";
+import { parsePageParam } from "../lib/page-param";
 import Footer from "../components/footer";
 import Icon from "../components/icon";
 import MovieImage from "../components/movie-image";
+import Pagination from "../components/pagination";
+import StatusMessage, { StatusButton } from "../components/status-message";
 import { BookmarkButton } from "../components/bookmark-button";
 
-interface MovieSearchPageProps {
-  movies: Movie[];
-}
-
-// 제목 또는 원제(대소문자 무시)에 검색어가 포함된 영화만 반환
-function searchMovies(movies: Movie[], keyword: string) {
-  const lower = keyword.toLowerCase();
-  return movies.filter(
-    ({ title, originalTitle }) =>
-      title.toLowerCase().includes(lower) ||
-      originalTitle.toLowerCase().includes(lower),
-  );
-}
-
-function MovieSearchPage({ movies }: MovieSearchPageProps) {
+function MovieSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const keyword = (searchParams.get("query") ?? "").trim();
+  const page = parsePageParam(searchParams.get("page"));
 
+  // 새 검색어는 1페이지부터 보여준다
   const search = (next: string) => {
     const value = next.trim();
     if (!value) return;
     setSearchParams({ query: value });
+  };
+
+  const changePage = (next: number) => {
+    setSearchParams({ query: keyword, page: String(next) });
+    window.scrollTo({ top: 0 });
   };
 
   if (!keyword) {
@@ -39,8 +37,9 @@ function MovieSearchPage({ movies }: MovieSearchPageProps) {
     <SearchResults
       key={keyword}
       keyword={keyword}
-      results={searchMovies(movies, keyword)}
+      page={page}
       onSearch={search}
+      onPageChange={changePage}
     />
   );
 }
@@ -98,11 +97,20 @@ function SearchLanding({ onSearch }: SearchFormProps) {
 
 interface SearchResultsProps extends SearchFormProps {
   keyword: string;
-  results: Movie[];
+  page: number;
+  onPageChange: (page: number) => void;
 }
 
-function SearchResults({ keyword, results, onSearch }: SearchResultsProps) {
+function SearchResults({
+  keyword,
+  page,
+  onSearch,
+  onPageChange,
+}: SearchResultsProps) {
   const [query, setQuery] = useState(keyword);
+  const result = useAsync(`search:${keyword}:${page}`, (signal) =>
+    searchMovies(keyword, page, signal),
+  );
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -111,7 +119,7 @@ function SearchResults({ keyword, results, onSearch }: SearchResultsProps) {
 
   return (
     <>
-      <main className="flex w-full flex-col items-start px-20 py-6">
+      <main className="flex w-full flex-1 flex-col items-start px-20 py-6">
         <div className="flex w-full flex-col gap-[17px]">
           <h1 className="text-[38px] leading-11 font-bold tracking-[-1.71px]">
             영화 검색
@@ -153,54 +161,91 @@ function SearchResults({ keyword, results, onSearch }: SearchResultsProps) {
           <h2 id="results-title" className="text-lg font-bold">
             ‘{keyword}’ 검색 결과
           </h2>
-          <span className="text-xs text-gray-400">
-            영화 {results.length}편 · 1페이지
-          </span>
+          {result.status === "success" && (
+            <span className="text-xs text-gray-400">
+              영화 {result.data.totalResults.toLocaleString()}편 · {page}페이지
+            </span>
+          )}
         </div>
 
-        {results.length === 0 ? (
-          <p className="w-full py-20 text-center text-sm text-gray-600">
-            ‘{keyword}’에 해당하는 영화가 없어요. 다른 검색어로 찾아보세요.
-          </p>
-        ) : (
-          <div className="grid w-full grid-cols-2 gap-x-10">
-            {results.map((movie) => (
-              <article
-                key={movie.id}
-                className="flex items-start gap-[18px] py-5"
-              >
-                <Link
-                  to={`/movies/${movie.id}`}
-                  className="h-[190px] w-[126px] shrink-0 overflow-hidden rounded-[10px] bg-gray-200"
-                >
-                  <MovieImage
-                    src={movie.posterPath}
-                    alt={`${movie.title} 포스터`}
-                  />
-                </Link>
-
-                <div className="flex flex-1 flex-col items-start gap-2 pt-1">
-                  <h3 className="text-lg leading-6 font-bold">{movie.title}</h3>
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span>{movie.originalTitle}</span>
-                    <span>{movie.releaseDate}</span>
-                  </div>
-                  <p className="text-[12.5px] leading-5 text-gray-600">
-                    {movie.overview}
-                  </p>
-                  <Link
-                    to={`/movies/${movie.id}`}
-                    className="flex items-center gap-1 text-xs font-extrabold text-primary"
-                  >
-                    상세 보기
-                    <Icon name="arrow-right" size={16} />
-                  </Link>
-                  <BookmarkButton movieId={movie.id} />
-                </div>
-              </article>
-            ))}
-          </div>
+        {result.status === "loading" && (
+          <StatusMessage title="영화를 검색하는 중이에요..." />
         )}
+
+        {result.status === "error" && (
+          <StatusMessage
+            title="검색 결과를 불러오지 못했어요."
+            description={getErrorMessage(result.error)}
+            action={
+              <StatusButton onClick={result.retry}>다시 시도</StatusButton>
+            }
+          />
+        )}
+
+        {result.status === "success" &&
+          (result.data.totalResults === 0 ? (
+            <StatusMessage
+              title={`‘${keyword}’에 해당하는 영화가 없어요.`}
+              description="다른 검색어로 찾아보세요."
+            />
+          ) : result.data.movies.length === 0 ? (
+            <StatusMessage
+              title={`${page}페이지에는 검색 결과가 없어요.`}
+              description={`검색 결과는 ${result.data.totalPages}페이지까지 있어요.`}
+              action={
+                <StatusButton onClick={() => onPageChange(1)}>
+                  1페이지로 이동
+                </StatusButton>
+              }
+            />
+          ) : (
+            <>
+              <div className="grid w-full grid-cols-2 gap-x-10">
+                {result.data.movies.map((movie) => (
+                  <article
+                    key={movie.id}
+                    className="flex items-start gap-[18px] py-5"
+                  >
+                    <Link
+                      to={`/movies/${movie.id}`}
+                      className="h-[190px] w-[126px] shrink-0 overflow-hidden rounded-[10px] bg-gray-200"
+                    >
+                      <MovieImage
+                        src={movie.posterPath}
+                        alt={`${movie.title} 포스터`}
+                      />
+                    </Link>
+
+                    <div className="flex flex-1 flex-col items-start gap-2 pt-1">
+                      <h3 className="text-lg leading-6 font-bold">
+                        {movie.title}
+                      </h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-400">
+                        <span>{movie.originalTitle}</span>
+                        <span>{movie.releaseDate}</span>
+                      </div>
+                      <p className="line-clamp-3 text-[12.5px] leading-5 text-gray-600">
+                        {movie.overview || "등록된 줄거리가 없어요."}
+                      </p>
+                      <Link
+                        to={`/movies/${movie.id}`}
+                        className="flex items-center gap-1 text-xs font-extrabold text-primary"
+                      >
+                        상세 보기
+                        <Icon name="arrow-right" size={16} />
+                      </Link>
+                      <BookmarkButton movieId={movie.id} />
+                    </div>
+                  </article>
+                ))}
+              </div>
+              <Pagination
+                currentPage={page}
+                totalPages={result.data.totalPages}
+                onPageChange={onPageChange}
+              />
+            </>
+          ))}
       </main>
       <Footer />
     </>

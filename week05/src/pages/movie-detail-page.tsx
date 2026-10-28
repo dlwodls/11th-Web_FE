@@ -1,47 +1,70 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { MovieDetail } from "../types/movie";
+import { getMovieDetail } from "../api/movies";
+import { getErrorMessage, isNotFoundError } from "../api/tmdb";
+import { useAsync } from "../hooks/use-async";
 import Footer from "../components/footer";
 import Icon from "../components/icon";
 import MovieImage from "../components/movie-image";
+import StatusMessage, { StatusButton } from "../components/status-message";
 import { cn } from "../lib/cn";
 import { useBookmarkStore } from "../stores/bookmark-store";
 
-interface MovieDetailPageProps {
-  movies: MovieDetail[];
-}
-
 const RATINGS = [1, 2, 3, 4, 5];
 
-function MovieDetailPage({ movies }: MovieDetailPageProps) {
+function MovieDetailPage() {
   const { movieId } = useParams();
-  const movie = movies.find((m) => m.id === Number(movieId));
+  const id = Number(movieId);
+  const detail = useAsync(`detail:${movieId}`, (signal) =>
+    getMovieDetail(id, signal),
+  );
   const toggleBookmark = useBookmarkStore((state) => state.toggleBookmark);
   const isBookmarked = useBookmarkStore((state) =>
-    state.bookmarkedMovieIds.includes(Number(movieId)),
+    state.bookmarkedMovieIds.includes(id),
   );
 
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
 
-  if (!movie) {
+  if (detail.status === "loading") {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 px-20 py-6">
-        <h1 className="text-[21px] font-bold">영화를 찾을 수 없어요.</h1>
-        <Link to="/" className="text-sm font-extrabold text-primary">
-          영화 목록으로 돌아가기
-        </Link>
+      <main className="flex flex-1 flex-col px-20 py-6">
+        <StatusMessage title="영화 정보를 불러오는 중이에요..." />
       </main>
     );
   }
 
+  if (detail.status === "error") {
+    const notFound = isNotFoundError(detail.error);
+    return (
+      <main className="flex flex-1 flex-col px-20 py-6">
+        <StatusMessage
+          title={
+            notFound
+              ? "영화를 찾을 수 없어요."
+              : "영화 정보를 불러오지 못했어요."
+          }
+          description={notFound ? undefined : getErrorMessage(detail.error)}
+          action={
+            notFound ? (
+              <Link to="/" className="text-sm font-extrabold text-primary">
+                영화 목록으로 돌아가기
+              </Link>
+            ) : (
+              <StatusButton onClick={detail.retry}>다시 시도</StatusButton>
+            )
+          }
+        />
+      </main>
+    );
+  }
+
+  const movie = detail.data;
+
   return (
     <>
       <section className="relative h-[360px] w-full overflow-hidden">
-        <MovieImage
-          src={movie.backdropPath}
-          alt={`${movie.title} 배경`}
-        />
+        <MovieImage src={movie.backdropPath} alt={`${movie.title} 배경`} />
         <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/30 to-black/20" />
 
         <div className="absolute inset-0 flex flex-col items-start justify-between px-20 py-6 text-white">
@@ -61,7 +84,7 @@ function MovieDetailPage({ movies }: MovieDetailPageProps) {
             <div className="flex items-center gap-2 text-[13px] font-bold">
               <span>{movie.releaseDate}</span>
               <span>·</span>
-              <span>{movie.genres.join(" · ")}</span>
+              <span>{movie.genres.join(" · ") || "장르 정보 없음"}</span>
               <span>·</span>
               <span>{movie.runtime}</span>
             </div>
@@ -71,17 +94,18 @@ function MovieDetailPage({ movies }: MovieDetailPageProps) {
 
       <main className="flex w-full items-start gap-8 px-20 py-6">
         <div className="h-[286px] w-[200px] shrink-0 overflow-hidden rounded-[10px] bg-surface shadow-[0_12px_30px_rgba(12,15,20,0.12)]">
-          <MovieImage
-            src={movie.posterPath}
-            alt={`${movie.title} 포스터`}
-          />
+          <MovieImage src={movie.posterPath} alt={`${movie.title} 포스터`} />
         </div>
 
         <section className="flex flex-1 flex-col items-start gap-3">
-          <h2 className="text-[21px] leading-[25px] font-bold tracking-[-0.63px]">
-            {movie.tagline}
-          </h2>
-          <p className="text-sm leading-6 text-gray-600">{movie.overview}</p>
+          {movie.tagline && (
+            <h2 className="text-[21px] leading-[25px] font-bold tracking-[-0.63px]">
+              {movie.tagline}
+            </h2>
+          )}
+          <p className="text-sm leading-6 text-gray-600">
+            {movie.overview || "등록된 줄거리가 없어요."}
+          </p>
           <button
             type="button"
             aria-pressed={isBookmarked}

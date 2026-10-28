@@ -15,11 +15,8 @@ function App() {
       <Header />
       <Routes>
         <Route path="/" element={<MovieListPage />} />
-        <Route
-          path="/movies/:movieId"
-          element={<MovieDetailPage movies={movies} />}
-        />
-        <Route path="/search" element={<MovieSearchPage movies={movies} />} />
+        <Route path="/movies/:movieId" element={<MovieDetailPage />} />
+        <Route path="/search" element={<MovieSearchPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/my" element={<MyPage movies={movies} />} />
