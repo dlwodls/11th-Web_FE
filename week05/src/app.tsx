@@ -14,7 +14,7 @@ function App() {
     <div className="flex min-h-screen flex-col bg-surface font-sans text-ink">
       <Header />
       <Routes>
-        <Route path="/" element={<MovieListPage movies={movies} />} />
+        <Route path="/" element={<MovieListPage />} />
         <Route
           path="/movies/:movieId"
           element={<MovieDetailPage movies={movies} />}
