@@ -1,45 +1,66 @@
-import { useEffect, useState } from "react";
-import type { Movie } from "../types/movie";
-import type { TmdbMovie, TmdbPage } from "../types/tmdb";
-import { toMovie } from "../lib/tmdb";
+import { useSearchParams } from "react-router-dom";
+import { getPopularMovies } from "../api/movies";
+import { getErrorMessage } from "../api/tmdb";
+import { useAsync } from "../hooks/use-async";
+import { parsePageParam } from "../lib/page-param";
 import Footer from "../components/footer";
 import MovieGrid from "../components/movie-grid";
 import Pagination from "../components/pagination";
+import StatusMessage, { StatusButton } from "../components/status-message";
 
 function MovieListPage() {
-  const [movies, setMovies] = useState<Movie[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = parsePageParam(searchParams.get("page"));
+  const popular = useAsync(`popular:${page}`, (signal) =>
+    getPopularMovies(page, signal),
+  );
 
-  // 순수 fetch 로 인기 영화 1페이지 요청
-  useEffect(() => {
-    const controller = new AbortController();
-
-    fetch("https://api.themoviedb.org/3/movie/popular?language=ko-KR&page=1", {
-      headers: {
-        Authorization: `Bearer ${import.meta.env.VITE_TMDB_ACCESS_TOKEN}`,
-      },
-      signal: controller.signal,
-    })
-      .then((response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json() as Promise<TmdbPage<TmdbMovie>>;
-      })
-      .then((data) => setMovies(data.results.map(toMovie)))
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        console.error("인기 영화 요청 실패", error);
-      });
-
-    return () => controller.abort();
-  }, []);
+  const changePage = (next: number) => {
+    setSearchParams({ page: String(next) });
+    window.scrollTo({ top: 0 });
+  };
 
   return (
     <>
-      <main className="flex w-full flex-col items-start gap-5 px-20 py-6">
+      <main className="flex w-full flex-1 flex-col items-start gap-5 px-20 py-6">
         <h1 className="text-[38px] leading-11 font-bold tracking-[-1.71px]">
           영화 목록
         </h1>
-        <MovieGrid movies={movies} showBookmark />
-        <Pagination currentPage={1} totalPages={5} />
+
+        {popular.status === "loading" && (
+          <StatusMessage title="영화를 불러오는 중이에요..." />
+        )}
+
+        {popular.status === "error" && (
+          <StatusMessage
+            title="영화 목록을 불러오지 못했어요."
+            description={getErrorMessage(popular.error)}
+            action={
+              <StatusButton onClick={popular.retry}>다시 시도</StatusButton>
+            }
+          />
+        )}
+
+        {popular.status === "success" &&
+          (popular.data.movies.length === 0 ? (
+            <StatusMessage
+              title="표시할 영화가 없어요."
+              action={
+                <StatusButton onClick={() => changePage(1)}>
+                  1페이지로 이동
+                </StatusButton>
+              }
+            />
+          ) : (
+            <>
+              <MovieGrid movies={popular.data.movies} showBookmark />
+              <Pagination
+                currentPage={page}
+                totalPages={popular.data.totalPages}
+                onPageChange={changePage}
+              />
+            </>
+          ))}
       </main>
       <Footer />
     </>
